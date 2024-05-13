@@ -1,26 +1,24 @@
 import torch.optim as optim
-from functions import *
+from utils import *
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from model import ModelIAS, init_weights
+from model import ModelIAS
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
-from utils import eval_loop, train_loop
+from function import eval_loop, train_loop, init_weights, save_results
 
 hid_size = 200
 emb_size = 300
 
 DROP = True
-BIDIRECTIONAL = False
+BIDIRECTIONAL = True
 
-lr = 2.5                             # learning rate
+lr = 5                             # learning rate
 clip = 5                                # Clip the gradient
 
 tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
 test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
-print('Train samples:', len(tmp_train_raw))
-print('Test samples:', len(test_raw))
 
 pprint(tmp_train_raw[0])
 
@@ -112,6 +110,8 @@ results_test, intent_test, _ = eval_loop(test_loader, criterion_slots,
 print('Slot F1: ', results_test['total']['f'])
 print('Intent Accuracy:', intent_test['accuracy'])
 
+save_results(lr, x, sampled_epochs, losses_dev, losses_train, DROP, BIDIRECTIONAL)
+
 plt.figure(num = 3, figsize=(8, 5)).patch.set_facecolor('white')
 plt.title('Train and Dev Losses')
 plt.ylabel('Loss')
@@ -120,6 +120,19 @@ plt.plot(sampled_epochs, losses_train, label='Train loss')
 plt.plot(sampled_epochs, losses_dev, label='Dev loss')
 plt.legend()
 plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
