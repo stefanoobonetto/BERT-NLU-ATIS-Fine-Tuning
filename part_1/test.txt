@@ -1,0 +1,6 @@
+test 1 (vergine)    ----->  Slot F1:  0.9189851268591427
+                            Intent Accuracy: 0.9372900335946248
+
+test 2 (dropout)    ----->  Slot F1:  0.6821169145624352
+                            Intent Accuracy: 0.6371780515117581
+
