@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers.modeling_bert import BertPreTrainedModel, BertModel, BertConfig
+from transformers.modeling_bert import BertPreTrainedModel, BertModel #, BertConfig
 from torchcrf import CRF
 from .module import IntentClassifier, SlotClassifier
 
@@ -27,6 +27,9 @@ class JointBERT(BertPreTrainedModel):
 
         intent_logits = self.intent_classifier(pooled_output)
         slot_logits = self.slot_classifier(sequence_output)
+
+
+
 
         total_loss = 0
         # 1. Intent Softmax

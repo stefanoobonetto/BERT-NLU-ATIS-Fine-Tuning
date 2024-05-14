@@ -6,21 +6,18 @@ from model import JointBERT
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
+from transformers import BertTokenizer, BertModel
+from pprint import pprint
 from function import eval_loop, train_loop, init_weights, save_results
 
 hid_size = 200
-emb_size = 300
+emb_size = 300  
 
-DROP = True
-BIDIRECTIONAL = True
-
-lr = 5                             # learning rate
-clip = 5                                # Clip the gradient
+lr = 5                                   # learning rate
+clip = 5                                 # Clip the gradients
 
 tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
 test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
-
-pprint(tmp_train_raw[0])
 
 portion = 0.10
 
@@ -37,6 +34,7 @@ for id_y, y in enumerate(intents):
         labels.append(y)
     else:
         mini_train.append(tmp_train_raw[id_y])
+
 # Random Stratify
 X_train, X_dev, y_train, y_dev = train_test_split(inputs, labels, test_size=portion, 
                                                     random_state=42, 
@@ -61,12 +59,21 @@ out_slot = len(lang.slot2id)
 out_int = len(lang.intent2id)
 vocab_len = len(lang.word2id)
 
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
+model = BertModel.from_pretrained("bert-base-uncased") # Download the model
+
+bert_w2id = {} 
+
+for w in lang.word2id.keys():
+    bert_w2id[w] = tokenizer(w)['input_ids']
+
+
 model = JointBERT(hid_size, out_slot, out_int, emb_size, vocab_len, pad_index=PAD_TOKEN).to(device)
 model.apply(init_weights)
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
-criterion_intents = nn.CrossEntropyLoss() # Because we do not have the pad token
+criterion_intents = nn.CrossEntropyLoss()                                   # Because we do not have the pad token
 
 # Create our datasets
 train_dataset = IntentsAndSlots(train_raw, lang)
@@ -107,10 +114,11 @@ for x in tqdm(range(1,n_epochs)):
 
 results_test, intent_test, _ = eval_loop(test_loader, criterion_slots, 
                                          criterion_intents, model, lang)    
+
 print('Slot F1: ', results_test['total']['f'])
 print('Intent Accuracy:', intent_test['accuracy'])
 
-save_results(lr, x, sampled_epochs, losses_dev, losses_train, DROP, BIDIRECTIONAL)
+save_results(lr, x, sampled_epochs, losses_dev, losses_train)
 
 plt.figure(num = 3, figsize=(8, 5)).patch.set_facecolor('white')
 plt.title('Train and Dev Losses')
