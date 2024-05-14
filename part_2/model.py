@@ -1,23 +1,41 @@
 import torch
 import torch.nn as nn
-from transformers.modeling_bert import BertPreTrainedModel, BertModel #, BertConfig
-from torchcrf import CRF
-from .module import IntentClassifier, SlotClassifier
+from transformers import BertPreTrainedModel, BertModel #, BertConfig
+# from .module import IntentClassifier, SlotClassifier
 
+class IntentClassifier(nn.Module):
+    def __init__(self, input_dim, num_intent_labels, dropout_rate=0.):
+        super(IntentClassifier, self).__init__()
+        self.dropout = nn.Dropout(dropout_rate)
+        self.linear = nn.Linear(input_dim, num_intent_labels)
+
+    def forward(self, x):
+        x = self.dropout(x)
+        return self.linear(x)
+
+
+class SlotClassifier(nn.Module):
+    def __init__(self, input_dim, num_slot_labels, dropout_rate=0.):
+        super(SlotClassifier, self).__init__()
+        self.dropout = nn.Dropout(dropout_rate)
+        self.linear = nn.Linear(input_dim, num_slot_labels)
+
+    def forward(self, x):
+        x = self.dropout(x)
+        return self.linear(x)
 
 class JointBERT(BertPreTrainedModel):
     def __init__(self, config, args, intent_label_lst, slot_label_lst):
         super(JointBERT, self).__init__(config)
-        self.args = args
-        self.num_intent_labels = len(intent_label_lst)
-        self.num_slot_labels = len(slot_label_lst)
-        self.bert = BertModel(config=config)  # Load pretrained bert
+        
+        
+        # self.args = args
+        # self.num_intent_labels = len(intent_label_lst)
+        # self.num_slot_labels = len(slot_label_lst)
+        # self.bert = BertModel(config=config)  # Load pretrained bert
 
-        self.intent_classifier = IntentClassifier(config.hidden_size, self.num_intent_labels, args.dropout_rate)
-        self.slot_classifier = SlotClassifier(config.hidden_size, self.num_slot_labels, args.dropout_rate)
-
-        if args.use_crf:
-            self.crf = CRF(num_tags=self.num_slot_labels, batch_first=True)
+        # self.intent_classifier = IntentClassifier(config.hidden_size, self.num_intent_labels, args.dropout_rate)
+        # self.slot_classifier = SlotClassifier(config.hidden_size, self.num_slot_labels, args.dropout_rate)
 
     def forward(self, input_ids, attention_mask, token_type_ids, intent_label_ids, slot_labels_ids):
         outputs = self.bert(input_ids, attention_mask=attention_mask,
