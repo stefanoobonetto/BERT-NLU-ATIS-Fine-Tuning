@@ -11,7 +11,7 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     loss_array = []
     for sample in data:
         optimizer.zero_grad() # Zeroing the gradient
-        slots, intent = model(sample['utterances'], sample['slots_len'])
+        slots, intent = model(sample['utterances'])
         loss_intent = criterion_intents(intent, sample['intents'])
         loss_slot = criterion_slots(slots, sample['y_slots'])
         loss = loss_intent + loss_slot # In joint training we sum the losses. 
@@ -158,4 +158,3 @@ def save_results(lr, epoch, sampled_epochs, losses_dev, losses_train, drop, bidi
     save_to_csv(losses_train, os.path.join(dir, "" + test + ".csv"))
 
     print("Experiment stopped at epoch: ", epoch, " with lr: ", lr, "[drop: ", drop, ", bidirectional: ", bidir, "]")
-
