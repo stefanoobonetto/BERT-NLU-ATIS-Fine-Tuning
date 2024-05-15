@@ -4,6 +4,7 @@ import torch.nn as nn
 import os
 import csv
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 from sklearn.metrics import classification_report
 
 def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=5):
@@ -13,7 +14,13 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
         optimizer.zero_grad() # Zeroing the gradient
         slots, intent = model(sample['utterances'])
         loss_intent = criterion_intents(intent, sample['intents'])
-        loss_slot = criterion_slots(slots, sample['y_slots'])
+        print("Shape slots predicted:", slots.shape)
+        print("Shape slots gt:", len(sample['slots']))
+        # loss_slot = criterion_slots(slots.view(-1, slots.shape[-1]), sample['y_slots'].view(-1))
+        loss_slot = criterion_slots(slots, sample['slots'])
+        loss_intent = criterion_intents(intent, sample['intents'])
+        
+
         loss = loss_intent + loss_slot # In joint training we sum the losses. 
                                        # Is there another way to do that?
         loss_array.append(loss.item())

@@ -81,7 +81,10 @@ test_dataset.convert_to_bert_dataset(lang, tokenizer, test_raw)
 
 config = BertConfig.from_pretrained('bert-base-uncased')  # Load BERT configuration
 
-model = JointBERT(hid_size, len(train_dataset.intent_ids), len(train_dataset.slot_ids), config).to(device)
+vocab_len_slots = len(lang.slot2id)
+print("Vocabulary length of slots:", vocab_len_slots)
+
+model = JointBERT(hid_size, len(lang.intent2id), len(lang.slot2id), config).to(device)
 model.apply(init_weights)
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
