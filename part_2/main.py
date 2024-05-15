@@ -12,7 +12,7 @@ from function import eval_loop, train_loop, init_weights, save_results
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
-hid_size = 200
+hid_size = 768
 emb_size = 300  
 
 lr = 5                                   # learning rate
