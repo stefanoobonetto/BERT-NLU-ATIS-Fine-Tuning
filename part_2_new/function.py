@@ -66,7 +66,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 utt_ids = sample['utterance'][id_seq][:length].tolist()
                 gt_ids = sample['y_slots'][id_seq].tolist()
                 gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]
-                utterance = [tokenizer.convert_ids_to_tokens([utt_ids]) ]           # for elem in utt_ids 
+                utterance = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in utt_ids]
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
                 tmp_seq = []
@@ -153,17 +153,17 @@ def save_to_csv(data, filename):
         for idx, value in enumerate(data):
             writer.writerow([idx + 1, value])
 
-def save_results(lr, epoch, sampled_epochs, losses_dev, losses_train, drop, bidir):
+def save_results(lr, epoch, sampled_epochs, losses_dev, losses_train):
     
     dir = os.path.dirname(os.path.abspath(__file__))
     dir = os.path.join(dir, "results")
     dir = create_next_test_folder(dir)
 
     test = "[LSTM_"
-    if drop:
-        test += "drop_"
-    if bidir:
-        test += "bidirectional_"
+    # if drop:
+    #     test += "drop_"
+    # if bidir:
+    #     test += "bidirectional_"
     plot_line_graph(sampled_epochs, losses_dev, losses_train, os.path.join(dir, "loss_" + test + ".png"))
     save_to_csv(losses_dev, os.path.join(dir, "ppls_dev_" + test + ".csv"))
     save_to_csv(losses_train, os.path.join(dir, "" + test + ".csv"))
