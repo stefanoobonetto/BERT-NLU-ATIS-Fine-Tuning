@@ -9,7 +9,11 @@ test 3 (dropout + bidir)    ----->  Slot F1:  0.823693866853049
 
 
 
+Slot F1:  0
+Intent Accuracy: 0.05375139977603583
 
+
+(???)
 
 
 
