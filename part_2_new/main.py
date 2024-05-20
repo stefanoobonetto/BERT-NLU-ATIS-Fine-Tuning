@@ -1,6 +1,7 @@
 import torch.optim as optim
 from utils import *
 import torch.nn as nn
+import torch
 from sklearn.model_selection import train_test_split
 from model import JointBERT
 import matplotlib.pyplot as plt
@@ -97,7 +98,8 @@ patience = 3
 losses_train = []
 losses_dev = []
 sampled_epochs = []
-best_f1 = 0
+best_f1 = -1
+
 for x in tqdm(range(1,n_epochs)):
     loss = train_loop(train_loader, optimizer, criterion_slots, 
                       criterion_intents, model, clip=clip)

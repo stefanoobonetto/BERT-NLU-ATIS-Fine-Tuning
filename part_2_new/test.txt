@@ -26,7 +26,3 @@ I modelli pre-addestrati possono essere sottoposti a fine-tuning su compiti NLP.
 Bidirectional Encoder Representations from Transformers (BERT), che ha creato modelli all'avanguardia per una vasta gamma di compiti NLP, tra cui il 
 question answering (SQuAD v1.1), l'inferenza del linguaggio naturale e altri.
 
-
-
-
-

@@ -45,6 +45,9 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
         for sample in data:
             slots, intents = model(sample['utterances'], sample['slots_len'])
             
+            for gt, pred in zip(sample['intents'], intents):
+                print("[GT: ", gt, ", PRED: ", pred, "]")
+
             loss_intent = criterion_intents(intents, sample['intents'])
             
             loss_slot = criterion_slots(slots, sample['y_slots'])
@@ -85,6 +88,8 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
         
     report_intent = classification_report(ref_intents, hyp_intents, 
                                           zero_division=False, output_dict=True)
+    
+    # print("report_intent: ", report_intent)
     return results, report_intent, loss_array
 
 def init_weights(mat):
@@ -168,5 +173,5 @@ def save_results(lr, epoch, sampled_epochs, losses_dev, losses_train):
     save_to_csv(losses_dev, os.path.join(dir, "ppls_dev_" + test + ".csv"))
     save_to_csv(losses_train, os.path.join(dir, "" + test + ".csv"))
 
-    print("Experiment stopped at epoch: ", epoch, " with lr: ", lr, "[drop: ", drop, ", bidirectional: ", bidir, "]")
+    print("Experiment stopped at epoch: ", epoch, " with lr: ", lr)
 
