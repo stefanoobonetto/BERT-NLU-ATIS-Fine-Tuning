@@ -8,14 +8,14 @@ from collections import Counter
 import torch.nn as nn
 import torch.utils.data as data
 
-# device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
-device = 'cpu'
+# device = 'cpu'
 
+from torch.nn.utils.rnn import pad_sequence
 from transformers import BertTokenizer, BertConfig
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
 
-# os.environ['CUDA_LAUNCH_BLOCKING'] = "1" # Used to report errors on CUDA side
 PAD_TOKEN = 0
 
 def load_data(path):
@@ -29,11 +29,9 @@ def load_data(path):
     return dataset
 
 class Lang():
-    def __init__(self, words, intents, slots, cutoff=0):
-        self.word2id = self.w2id(words, cutoff=cutoff, unk=True)
+    def __init__(self, intents, slots, cutoff=0):
         self.slot2id = self.lab2id(slots)
         self.intent2id = self.lab2id(intents, pad=False)
-        self.id2word = {v:k for k, v in self.word2id.items()}
         self.id2slot = {v:k for k, v in self.slot2id.items()}
         self.id2intent = {v:k for k, v in self.intent2id.items()}
         
@@ -46,7 +44,7 @@ class Lang():
         for k, v in count.items():
             if v > cutoff:
                 vocab[k] = len(vocab)
-
+        
         return vocab
     
     def lab2id(self, elements, pad=True):                               # creates a dictionary that maps unique id to each label    
@@ -60,246 +58,101 @@ class Lang():
     
 class IntentsAndSlots (data.Dataset):
     # Mandatory methods are __init__, __len__ and __getitem__
-    def __init__(self, raw_data, lang, unk='unk'):
+   
+    def __init__(self, dataset, lang, unk='unk'):
         self.utterances = []
         self.intents = []
         self.slots = []
-        self.unk = unk
+        self.slot_ids = []
+        self.intent_ids = []
+        self.utt_ids = []
 
-        bert_utt = []
-
-        for string in raw_data:
-            bert_utt.append(tokenizer(string['utterance'], return_tensors='pt'))
-
-
-        # for x in raw_data:
-        #     self.utterances.append("[CLS] " + x['utterance'] + " [SEP]")
-        #     self.slots.append(x['slots'])
-        for id, item in enumerate(raw_data):
-            new_slot = "O "
-            # print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-            # print("------> utt_id[0]", self.utt_ids[id])
-
-            # print("len_item: ", len(item['utterance'].split()), ", len_utt_ids: ", len(bert_utt[id]['input_ids'][0]) - 2)
-
-            if len(item['utterance'].split()) == len(bert_utt[id]['input_ids'][0]) - 2:               # no variation in splitting
-                new_slot += item['slots'] 
-                new_slot += " O"
-
-                
-            else:
-                # print("variation in splitting", id)
-                # self.changed[id] = True
-                slots_list = item['slots'].split()
-                # print("[VAR]\n", item['slots'], "")
-                # print("slots_list: ", slots_list, ", len: ", len(slots_list))
-                # print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-                for i, word in enumerate(item['utterance'].split()):
-                    bert_word = tokenizer(word)['input_ids']
-                    # print("bert_word: ", bert_word, ", len: ", len(bert_word))
-                    new_slot += slots_list[i] + " "
-                    for j in range(len(bert_word) - 3):
-                        # print("before: ", new_slot)
-                        new_slot += "[PAD] "
-                        # print("after: ", new_slot)
-                        # print(word, " splitted in two slots, adding a 0 after ", slots_list[i])
-                new_slot += "O"
-                # print("into\n", new_slot, "\n\n")
-            self.slots.append(new_slot)
         
-        for x in raw_data:
+        self.unk = unk
+        
+        for x in dataset:
             self.utterances.append("[CLS] " + x['utterance'] + " [SEP]")
+            self.slots.append("O " + x['slots'] + " O")
             self.intents.append(x['intent'])
 
+        utter_ids, res_slot, res_attention, res_token_type_id = self.mapping_seq(self.utterances, self.slots, tokenizer, lang.slot2id)
+
+        for utt, att, token in zip(utter_ids, res_attention, res_token_type_id):
+            self.utt_ids.append({'input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
+
+        for elem in res_slot:
+            self.slot_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
+
+        intent_ids = self.mapping_lab(self.intents, tokenizer)
+        for elem in intent_ids:
+            self.intent_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
+
         # for i in range(len(self.utterances)):
-        #     print("Phrase:                  ", self.utterances[i])
-        #     print("Slots:                  ", self.slots[i])
-        #     print("Intent:                  ", self.intents[i])
+        #     print("Phrase:                      ", self.utterances[i])
+        #     print("Phrase[IDs]:                 ", self.utt_ids[i]['input_ids'])
+
+        #     # print("last_id: ", self.utt_ids[i]['input_ids'][-1], " correspond to ", tokenizer.convert_ids_to_tokens([self.utt_ids[i]['input_ids'][-1]]))
+        #     print("Slots:                       ", self.slots[i])
+        #     print("Slots[IDs]:                  ", self.slot_ids[i]['input_ids'])
+        #     print("Intent:                      ", self.intents[i])
+        #     print("Intent[IDs]:                 ", self.intent_ids[i]['input_ids'])
+
         #     print("\n\n")
 
-
-        print(len(self.utterances))
-        print(len(self.slots))
-        print(len(self.intents))
-        
-        self.utt_ids = self.mapping_seq(self.utterances, tokenizer)
-        self.slot_ids = self.mapping_seq(self.slots, tokenizer)
-        self.intent_ids = self.mapping_seq(self.intents, tokenizer)
-
-        for i in range(len(self.utterances)):
-            print("Phrase:                  ", self.utterances[i])
-            print("Phrase[IDs]:                  ", self.utt_ids[i])
-            print("Slots:                  ", self.slots[i])
-            print("Slots[IDs]:                  ", self.slot_ids[i])
-            print("Intent:                  ", self.intents[i])
-            print("Intent[IDs]:                  ", self.intent_ids[i])
-
-            print("\n\n")
-
-
-        #               occhio che ora aggiunge i doppi 101 e 102:
-        
-        # Phrase:                   [CLS] find me a flight that flies from memphis to tacoma [SEP]
-        # Phrase[IDs]:                   {'input_ids': [101, 101, 2424, 2033, 1037, 3462, 2008, 10029, 2013, 9774, 2000, 22954, 102, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
-        # Slots:                   O O O O O O O O B-fromloc.city_name O B-toloc.city_name O
-        # Slots[IDs]:                   {'input_ids': [101, 1051, 1051, 1051, 1051, 1051, 1051, 1051, 1051, 1038, 1011, 2013, 4135, 2278, 1012, 2103, 1035, 2171, 1051, 1038, 1011, 2000, 4135, 2278, 1012, 2103, 1035, 2171, 1051, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'attention_mask': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
-        # Intent:                   flight
-        # Intent[IDs]:                   {'input_ids': [101, 3462, 102], 'token_type_ids': [0, 0, 0], 'attention_mask': [1, 1, 1]}
-
-        
-
-
-
-
-
-
-
-
-        # self.changed = [False for _ in range(len(raw_data))] # To keep track of changed slots
-        # bert_utt = []
-
-        # for string in raw_data:
-        #     bert_utt.append(tokenizer(string['utterance'], return_tensors='pt'))
-
-        # print("bert_utt: ", bert_utt)
-
-        # for x in raw_data:
-        #     self.utterances.append("[CLS] " + x['utterance'] + " [SEP]")
-        #     self.slots.append(x['slots'])
-        #     for id, item in enumerate(data):
-        #         new_slot = "O "
-        #         print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-        #         print("------> utt_id[0]", self.utt_ids[id])
-
-        #         print("len_item: ", len(item['utterance'].split()), ", len_utt_ids: ", len(bert_utt[id]['input_ids'][0]) - 2)
-
-        #         if len(item['utterance'].split()) == len(bert_utt[id]['input_ids'][0]) - 2:               # no variation in splitting
-        #             new_slot += item['slots'] 
-        #             new_slot += " O"
-
-        #             print("[NO VAR]\n", item['slots'], "\ninto\n", new_slot, "\n\n")
-
-        #             print("----------> no variation in splitting", id)
-        #         else:
-        #             print("variation in splitting", id)
-        #             self.changed[id] = True
-        #             slots_list = item['slots'].split()
-        #             print("[VAR]\n", item['slots'], "")
-        #             print("slots_list: ", slots_list, ", len: ", len(slots_list))
-        #             print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-        #             for i, word in enumerate(item['utterance'].split()):
-        #                 bert_word = tokenizer(word)['input_ids']
-        #                 print("bert_word: ", bert_word, ", len: ", len(bert_word))
-        #                 new_slot += slots_list[i] + " "
-        #                 for j in range(len(bert_word) - 3):
-        #                     print("before: ", new_slot)
-        #                     new_slot += "O "
-        #                     print("after: ", new_slot)
-        #                     print(word, " splitted in two slots, adding a 0 after ", slots_list[i])
-        #             new_slot += "O"
-        #             print("into\n", new_slot, "\n\n")
-        #         self.slots.append(new_slot)
-        #     self.intents.append(x['intent'])
-
-           
-
-    def __getitem__(self):
-        utt = torch.Tensor(self.utt_ids)
-        slots = torch.Tensor(self.slot_ids)
-        intent = self.intent_ids
-        sample = {'utterance': utt, 'slots': slots, 'intent': intent}
-        return sample
+    def __len__(self):
+        return len(self.utterances)
 
     def __getitem__(self, idx):
-        utt = torch.Tensor(self.utt_ids[idx])
-        slots = torch.Tensor(self.slot_ids[idx])
-        intent = self.intent_ids[idx]
+        utt = torch.Tensor(self.utt_ids[idx]["input_ids"])
+        slots = torch.Tensor(self.slot_ids[idx]["input_ids"])
+        intent = self.intent_ids[idx]["input_ids"]
         sample = {'utterance': utt, 'slots': slots, 'intent': intent}
         return sample
     
-    def convert_to_bert_dataset(self, lang, tokenizer, data_raw):
-
-        bert_utt = []
-
-        for string in data_raw:
-            bert_utt.append(tokenizer("[CLS] " + string['utterance'] + " [SEP]", return_tensors='pt'))
-
-        new_slots = []
-        for id, item in enumerate(data_raw):
-            new_slot = "O "
-            # print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-            # print("------> utt_id[0]", self.utt_ids[id])
-
-            # print("len_item: ", len(item['utterance'].split()), ", len_utt_ids: ", len(bert_utt[id]['input_ids'][0]) - 2)
-
-            if len(item['utterance'].split()) == len(bert_utt[id]['input_ids'][0]) - 2:               # no variation in splitting
-                new_slot += item['slots'] 
-                new_slot += " O"
-
-                # print("[NO VAR]\n", item['slots'], "\ninto\n", new_slot, "\n\n")
-
-                # print("----------> no variation in splitting", id)
-            else:
-                # print("variation in splitting", id)
-                # self.changed[id] = True
-                slots_list = item['slots'].split()
-                # print("[VAR]\n", item['slots'], "")
-                # print("slots_list: ", slots_list, ", len: ", len(slots_list))
-                # print("item: ", item['utterance'], ", n: ", len(item['utterance'].split()))
-                for i, word in enumerate(item['utterance'].split()):
-                    bert_word = tokenizer(word)['input_ids']
-                    # print("bert_word: ", bert_word, ", len: ", len(bert_word))
-                    new_slot += slots_list[i] + " "
-                    for j in range(len(bert_word) - 3):
-                        # print("before: ", new_slot)
-                        new_slot += "O "
-                        # print("after: ", new_slot)
-                        # print(word, " splitted in two slots, adding a 0 after ", slots_list[i])
-                new_slot += "O"
-                # print("into\n", new_slot, "\n\n")
-            new_slots.append(new_slot)
-            # print("\n")
-
-        self.change_slot_ids(new_slots, lang)
-
-        # for id, item in enumerate(data_raw):
-        #     print("\n\nitem_normal: \n", item["utterance"], "\n", item["slots"], "\n", item["intent"])
-        #     print("\nitem_bert: \n", self.utt_ids[id], "\n", self.slots[id], " ---> ", self.slot_ids[id], "\n", self.intents[id], " ---> ",self.intent_ids[id], "\n changed: ", self.changed[id])
-
-        return "--------> OK FINITOOOOO"
-
-
-    def change_slot_ids(self, new_slots, lang):
-        self.slots = new_slots
-
-        self.slot_ids = self.mapping_seq(self.slots, lang.slot2id)
-
-    def change_intent_ids(self, new_intent, lang):
-        self.intents = new_intent
-        self.intent_ids = self.mapping_lab(self.intents, lang.intent2id)
-    
-    def mapping_lab(self, data, mapper):
-        return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
-    
-    def mapping_seq(self, data, tokenizer): # Map sequences to number
+    def mapping_lab(self, data, tokenizer):
         res = []
-        # for seq in data:
-        #     tmp_seq = []
-        #     for x in seq.split():
-        #         if x in mapper:
-        #             tmp_seq.append(mapper[x])
-        #         else:
-        #             # tmp_seq.append(mapper[self.unk])
-        #             tmp_seq.append(mapper['unk'])
-        #     res.append(tmp_seq)
-        # return res
-
         for seq in data:
-            res.append(tokenizer(seq))
+            res.append(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq)))
+            # print("\n", seq.split(), "\n", tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq)), "\n\n")
         return res
+        # return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
+    
+    def mapping_seq(self, utterances, slots, tokenizer, mapper_slot): # Map sequences to number
+        res_utt = []
+        res_slot = []
+        res_attention = []
+        res_token_type_id = []
+        
+        for sequence, slot in zip(utterances, slots):
+            # print("utterance: ", sequence, ",            len: ", len(sequence.split()), "len_bert: ", len(tokenizer(sequence)['input_ids']))
+            tmp_seq = []
+            tmp_slot = []
+            tmp_attention = []
+            tmp_token_type_id = []
 
-        
-        
+            for word, elem in zip(sequence.split(), slot.split(' ')):
+                tmp_attention.append(1)
+                tmp_token_type_id.append(0)
+                word_tokens = tokenizer(word)
+                word_tokens = word_tokens[1:-1]
+
+                tmp_seq.extend(word_tokens['input_ids'])
+                tmp_slot.extend([mapper_slot[elem]] + [mapper_slot['pad']] * (len(word_tokens['input_ids']) - 1))
+
+                for i in range(len(word_tokens['input_ids']) - 1):
+                    tmp_attention.append(0)
+                    tmp_token_type_id.append(0)
+
+            res_utt.append(tmp_seq)
+            res_slot.append(tmp_slot)
+            res_attention.append(tmp_attention)
+            res_token_type_id.append(tmp_token_type_id)
+
+            
+            # print("utterance: ", tokenizer.tokenize(sequence), ",            len: ", len(tokenizer.tokenize(sequence)), "\nutterance_bert: ", tokenizer.convert_ids_to_tokens(tmp_seq) ,"len_bert: ", len(tmp_seq), "\n\n")
+
+        return res_utt, res_slot, res_attention, res_token_type_id
+
 def collate_fn(data):
     def merge(sequences):
         '''
@@ -320,15 +173,21 @@ def collate_fn(data):
         padded_seqs = padded_seqs.detach()  # We remove these tensors from the computational graph
         return padded_seqs, lengths
     # Sort data by seq lengths
+   
+    # print(data[0])                          # {'utterance': tensor([  101., 25493.,  7599.,  2013.,  2047.,  2259.,  2103.,  2000.,  5869.,
+                                            # 7136.,  2006.,  4465.,   102.]), 'slots': tensor([ 36.,   7.,  36.,  36.,   8.,  40.,  40.,  36., 110.,  20.,  36.,  59.,
+                                            # 36.]), 'intent': [3462]}
     data.sort(key=lambda x: len(x['utterance']), reverse=True) 
     new_item = {}
     for key in data[0].keys():
         new_item[key] = [d[key] for d in data]
         
     # We just need one length for packed pad seq, since len(utt) == len(slots)
-    src_utt, _ = merge(new_item['utterance'])
+    src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
     y_slots, y_lengths = merge(new_item["slots"])
-    intent = torch.LongTensor(new_item["intent"])
+    print("intent: ", new_item["intent"])
+    intent = [torch.LongTensor(i) for i in new_item["intent"]]
+    intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
     
     src_utt = src_utt.to(device) # We load the Tensor on our selected device
     y_slots = y_slots.to(device)
@@ -336,6 +195,8 @@ def collate_fn(data):
     y_lengths = torch.LongTensor(y_lengths).to(device)
     
     new_item["utterances"] = src_utt
+    # new_item["attention_mask"] = src_utt_attention
+    # new_item["token_type_ids"] = src_utt_token_type
     new_item["intents"] = intent
     new_item["y_slots"] = y_slots
     new_item["slots_len"] = y_lengths
