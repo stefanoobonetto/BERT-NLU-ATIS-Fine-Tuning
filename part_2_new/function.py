@@ -12,9 +12,12 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     for sample in data:
         optimizer.zero_grad() # Zeroing the gradient
         slots, intent = model(sample['utterances'], sample['slots_len'])
+        
+        print("Intent shape: ", intent.dim())
+        print("Intent sample shape: ", sample['intents'].dim())
         loss_intent = criterion_intents(intent, sample['intents'])
-        print("Shape slots predicted:", slots.shape)
-        print("Shape slots gt:", sample['y_slots'].shape)
+        # print("Shape slots predicted:", slots.shape)
+        # print("Shape slots gt:", sample['y_slots'].shape)
         loss_slot = criterion_slots(slots, sample['y_slots'])
         loss = loss_intent + loss_slot # In joint training we sum the losses. 
                                        # Is there another way to do that?

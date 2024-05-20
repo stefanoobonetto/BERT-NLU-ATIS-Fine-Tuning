@@ -83,7 +83,7 @@ class IntentsAndSlots (data.Dataset):
         for elem in res_slot:
             self.slot_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
 
-        intent_ids = self.mapping_lab(self.intents, tokenizer)
+        intent_ids = self.mapping_lab(self.intents, lang.intent2id)
         for elem in intent_ids:
             self.intent_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
 
@@ -109,13 +109,13 @@ class IntentsAndSlots (data.Dataset):
         sample = {'utterance': utt, 'slots': slots, 'intent': intent}
         return sample
     
-    def mapping_lab(self, data, tokenizer):
-        res = []
-        for seq in data:
-            res.append(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq)))
+    def mapping_lab(self, data, mapper):
+        # res = []
+        # for seq in data:
+            #res.append(tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq)))
             # print("\n", seq.split(), "\n", tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq)), "\n\n")
-        return res
-        # return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
+        # return res
+        return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
     
     def mapping_seq(self, utterances, slots, tokenizer, mapper_slot): # Map sequences to number
         res_utt = []
@@ -186,8 +186,8 @@ def collate_fn(data):
     src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
     y_slots, y_lengths = merge(new_item["slots"])
     print("intent: ", new_item["intent"])
-    intent = [torch.LongTensor(i) for i in new_item["intent"]]
-    intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
+    intent = torch.LongTensor(new_item["intent"])
+    # intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
     
     src_utt = src_utt.to(device) # We load the Tensor on our selected device
     y_slots = y_slots.to(device)
