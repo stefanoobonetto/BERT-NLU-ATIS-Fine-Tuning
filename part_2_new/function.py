@@ -6,6 +6,9 @@ import csv
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 
+from transformers import BertTokenizer, BertConfig
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
+
 def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=5):
     model.train()
     loss_array = []
@@ -13,8 +16,8 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
         optimizer.zero_grad() # Zeroing the gradient
         slots, intent = model(sample['utterances'], sample['slots_len'])
         
-        print("Intent shape: ", intent.dim())
-        print("Intent sample shape: ", sample['intents'].dim())
+        # print("Intent shape: ", intent.dim())
+        # print("Intent sample shape: ", sample['intents'].dim())
         loss_intent = criterion_intents(intent, sample['intents'])
         # print("Shape slots predicted:", slots.shape)
         # print("Shape slots gt:", sample['y_slots'].shape)
@@ -41,8 +44,11 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
     with torch.no_grad(): # It used to avoid the creation of computational graph
         for sample in data:
             slots, intents = model(sample['utterances'], sample['slots_len'])
+            
             loss_intent = criterion_intents(intents, sample['intents'])
+            
             loss_slot = criterion_slots(slots, sample['y_slots'])
+            
             loss = loss_intent + loss_slot 
             loss_array.append(loss.item())
             # Intent inference
@@ -60,7 +66,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 utt_ids = sample['utterance'][id_seq][:length].tolist()
                 gt_ids = sample['y_slots'][id_seq].tolist()
                 gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]
-                utterance = [lang.id2word[elem] for elem in utt_ids]
+                utterance = [tokenizer.convert_ids_to_tokens([utt_ids]) ]           # for elem in utt_ids 
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
                 tmp_seq = []

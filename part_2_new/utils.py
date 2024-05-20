@@ -185,7 +185,7 @@ def collate_fn(data):
     # We just need one length for packed pad seq, since len(utt) == len(slots)
     src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
     y_slots, y_lengths = merge(new_item["slots"])
-    print("intent: ", new_item["intent"])
+    # print("intent: ", new_item["intent"])
     intent = torch.LongTensor(new_item["intent"])
     # intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
     
@@ -200,7 +200,7 @@ def collate_fn(data):
     new_item["intents"] = intent
     new_item["y_slots"] = y_slots
     new_item["slots_len"] = y_lengths
-    print("type of slots: ", type(new_item["y_slots"]))
-    print("shape of slots: ", new_item["y_slots"].shape)
+    # print("type of slots: ", type(new_item["y_slots"]))
+    # print("shape of slots: ", new_item["y_slots"].shape)
     return new_item
 
