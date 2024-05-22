@@ -67,8 +67,9 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 length = sample['slots_len'].tolist()[id_seq]
                 utt_ids = sample['utterance'][id_seq][:length].tolist()
                 gt_ids = sample['y_slots'][id_seq].tolist()
-                # gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]           tokenizer.convert_ids_to_tokens(int(elem))
-                gt_slots = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in gt_ids[:length]]
+                gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]           
+                # gt_slots = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in gt_ids[:length]]
+                print("gt_slot: ", gt_slots)
                 utterance = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in utt_ids]
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
@@ -77,9 +78,11 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                     tmp_seq.append((utterance[id_el], lang.id2slot[elem]))
                 hyp_slots.append(tmp_seq)
         
-        for ref, hyp in zip(ref_slots, hyp_slots):
-            print("REF: ", ref, " --- HYP: ", hyp)
-            print("\n\n")
+        # for ref, hyp in zip(ref_slots, hyp_slots):
+        #     print("REF: ", ref, " --- HYP: ", hyp)
+        #     print("\n\n")
+
+
 
     try:            
         results = evaluate(ref_slots, hyp_slots)
