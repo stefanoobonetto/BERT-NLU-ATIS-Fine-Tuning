@@ -15,13 +15,13 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 # device = 'cpu'
 
-# print("device: ", device)
+print("device: ", device)
 
 hid_size = 768
 emb_size = 300  
 
-lr = 5                                   # learning rate
-clip = 5                                 # Clip the gradients
+lr = 0.00001                                   # learning rate
+clip = 5                                       # Clip the gradients
 
 tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
 test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
@@ -82,7 +82,7 @@ config = BertConfig.from_pretrained('bert-base-uncased')  # Load BERT configurat
 model = JointBERT(hid_size, out_int, out_slot, config).to(device)
 model.apply(init_weights)
 
-optimizer = optim.Adam(model.parameters(), lr=lr)
+optimizer = optim.AdamW(model.parameters(), lr=lr)
 criterion_slots = nn.CrossEntropyLoss(ignore_index=lang.slot2id['O'])
 criterion_intents = nn.CrossEntropyLoss()                                   # Because we do not have the pad token
 

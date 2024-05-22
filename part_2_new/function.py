@@ -14,19 +14,16 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     loss_array = []
     for sample in data:
         optimizer.zero_grad() # Zeroing the gradient
-        slots, intent = model(sample['utterances'], sample['slots_len'])
-        
-        # print("Intent shape: ", intent.dim())
-        # print("Intent sample shape: ", sample['intents'].dim())
+        slots, intent = model(sample['utterances'], sample['slots_len'], attention_mask=sample['attention_mask'])
+
         loss_intent = criterion_intents(intent, sample['intents'])
-        # print("Shape slots predicted:", slots.shape)
-        # print("Shape slots gt:", sample['y_slots'].shape)
+
         loss_slot = criterion_slots(slots, sample['y_slots'])
         loss = loss_intent + loss_slot # In joint training we sum the losses. 
                                        # Is there another way to do that?
         loss_array.append(loss.item())
         loss.backward() # Compute the gradient, deleting the computational graph
-        # clip the gradient to avoid exploding gradients
+                        # clip the gradient to avoid exploding gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)  
         optimizer.step() # Update the weights
     return loss_array
@@ -45,8 +42,8 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
         for sample in data:
             slots, intents = model(sample['utterances'], sample['slots_len'])
             
-            for gt, pred in zip(sample['intents'], intents):
-                print("[GT: ", gt, ", PRED: ", pred, "]")
+            # for gt, pred in zip(sample['intents'], intents):
+            #     print("[GT: ", gt, ", PRED: ", pred, "]")
 
             loss_intent = criterion_intents(intents, sample['intents'])
             
@@ -56,9 +53,11 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
             loss_array.append(loss.item())
             # Intent inference
             # Get the highest probable class
-            out_intents = [lang.id2intent[x] 
-                           for x in torch.argmax(intents, dim=1).tolist()] 
+            out_intents = [lang.id2intent[x] for x in torch.argmax(intents, dim=1).tolist()] 
             gt_intents = [lang.id2intent[x] for x in sample['intents'].tolist()]
+
+            # for gt, pred in zip(gt_intents, out_intents):
+                # print("[GT: ", gt, ", PRED: ", pred, "]")
             ref_intents.extend(gt_intents)
             hyp_intents.extend(out_intents)
             
@@ -68,7 +67,8 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 length = sample['slots_len'].tolist()[id_seq]
                 utt_ids = sample['utterance'][id_seq][:length].tolist()
                 gt_ids = sample['y_slots'][id_seq].tolist()
-                gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]
+                # gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]           tokenizer.convert_ids_to_tokens(int(elem))
+                gt_slots = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in gt_ids[:length]]
                 utterance = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in utt_ids]
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
@@ -88,6 +88,9 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
         
     report_intent = classification_report(ref_intents, hyp_intents, 
                                           zero_division=False, output_dict=True)
+
+    for elem in report_intent:
+        print(elem, report_intent[elem], "\n\n")
     
     # print("report_intent: ", report_intent)
     return results, report_intent, loss_array

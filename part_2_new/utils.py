@@ -85,7 +85,12 @@ class IntentsAndSlots (data.Dataset):
 
         intent_ids = self.mapping_lab(self.intents, lang.intent2id)
         for elem in intent_ids:
-            self.intent_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
+            self.intent_ids.append(elem)
+
+        # for intent, intent_id in zip(self.intents, self.intent_ids):
+        #     print("Intent: ", str(intent)) 
+        #     print("Intent[IDs]: ", str(intent_id))
+        #     print("Translated id to token: ", lang.id2intent[intent_id])
 
         # for i in range(len(self.utterances)):
         #     print("Phrase:                      ", self.utterances[i])
@@ -105,7 +110,7 @@ class IntentsAndSlots (data.Dataset):
     def __getitem__(self, idx):
         utt = torch.Tensor(self.utt_ids[idx]["input_ids"])
         slots = torch.Tensor(self.slot_ids[idx]["input_ids"])
-        intent = self.intent_ids[idx]["input_ids"]
+        intent = self.intent_ids[idx]
         sample = {'utterance': utt, 'slots': slots, 'intent': intent}
         return sample
     
@@ -173,7 +178,7 @@ def collate_fn(data):
         padded_seqs = padded_seqs.detach()  # We remove these tensors from the computational graph
         return padded_seqs, lengths
     # Sort data by seq lengths
-   
+
     # print(data[0])                          # {'utterance': tensor([  101., 25493.,  7599.,  2013.,  2047.,  2259.,  2103.,  2000.,  5869.,
                                             # 7136.,  2006.,  4465.,   102.]), 'slots': tensor([ 36.,   7.,  36.,  36.,   8.,  40.,  40.,  36., 110.,  20.,  36.,  59.,
                                             # 36.]), 'intent': [3462]}
@@ -184,6 +189,7 @@ def collate_fn(data):
         
     # We just need one length for packed pad seq, since len(utt) == len(slots)
     src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
+    
     y_slots, y_lengths = merge(new_item["slots"])
     # print("intent: ", new_item["intent"])
     intent = torch.LongTensor(new_item["intent"])
@@ -194,9 +200,28 @@ def collate_fn(data):
     intent = intent.to(device)
     y_lengths = torch.LongTensor(y_lengths).to(device)
     
+    tmp_att = []
+    tmp_token_type_id = []
+    src_utt_attention = []
+    src_utt_token_type = []
+
+    for seq in new_item["utterance"]:
+        for input_id in seq:
+            tmp_att.append(input_id != 0)
+            tmp_token_type_id.append(0)
+        src_utt_attention.append(tmp_att)
+        src_utt_token_type.append(tmp_token_type_id)
+
+    src_utt_attention = torch.tensor(src_utt_attention).to(device)
+    src_utt_token_type = torch.tensor(src_utt_token_type).to(device)
+
+    # print("attention: ", src_utt_attention)
+    # print("token_type: ", src_utt_token_type)
+    
+
     new_item["utterances"] = src_utt
-    # new_item["attention_mask"] = src_utt_attention
-    # new_item["token_type_ids"] = src_utt_token_type
+    new_item["attention_mask"] = src_utt_attention
+    new_item["token_type_ids"] = src_utt_token_type
     new_item["intents"] = intent
     new_item["y_slots"] = y_slots
     new_item["slots_len"] = y_lengths

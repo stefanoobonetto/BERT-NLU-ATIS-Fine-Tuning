@@ -5,18 +5,14 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class JointBERT(BertPreTrainedModel):
     def __init__(self, hid_size, len_vocab_intent,  len_vocab_slot, config):
-        super(JointBERT, self).__init__(config)
-
-        print(len_vocab_slot)
-
-        print(len_vocab_intent)        
+        super(JointBERT, self).__init__(config)     
 
         self.bert = BertModel(config=config)  # Load pretrained bert
 
         self.intent_layer = nn.Linear(hid_size, len_vocab_intent)
         self.slot_layer = nn.Linear(hid_size, len_vocab_slot)
 
-    def forward(self, utterance, seq_lengths):
+    def forward(self, utterance, seq_lengths, attention_mask=None):
         # utterance.size() = batch_size X seq_len
         
         # Get BERT embeddings
