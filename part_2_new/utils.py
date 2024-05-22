@@ -83,6 +83,8 @@ class IntentsAndSlots (data.Dataset):
         for elem in res_slot:
             self.slot_ids.append({'input_ids': elem, 'attention_mask': [], 'token_type_ids': []})
 
+
+
         intent_ids = self.mapping_lab(self.intents, lang.intent2id)
         for elem in intent_ids:
             self.intent_ids.append(elem)
