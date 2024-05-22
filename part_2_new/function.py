@@ -76,8 +76,16 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 for id_el, elem in enumerate(to_decode):
                     tmp_seq.append((utterance[id_el], lang.id2slot[elem]))
                 hyp_slots.append(tmp_seq)
+        
+        for ref, hyp in zip(ref_slots, hyp_slots):
+            print("REF: ", ref, " --- HYP: ", hyp)
+            print("\n\n")
+
     try:            
         results = evaluate(ref_slots, hyp_slots)
+
+        # print("results: ", results)
+        
     except Exception as ex:
         # Sometimes the model predicts a class that is not in REF
         print("Warning:", ex)
