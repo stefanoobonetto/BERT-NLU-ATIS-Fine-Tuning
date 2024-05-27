@@ -11,6 +11,8 @@ from transformers import BertTokenizer, BertConfig
 from pprint import pprint
 from function import eval_loop, train_loop, init_weights, save_results
 
+print("ciao")
+
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 # device = 'cpu'
