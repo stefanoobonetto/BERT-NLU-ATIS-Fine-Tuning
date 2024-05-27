@@ -68,7 +68,6 @@ lang = Lang(intents, slots)
 
 out_slot = len(lang.slot2id)
 out_int = len(lang.intent2id)
-# vocab_len = len(lang.word2id)
 
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
 # model = BertModel.from_pretrained("bert-base-uncased") # Download the model
