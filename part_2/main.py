@@ -1,6 +1,7 @@
 import torch.optim as optim
 from utils import *
 import torch.nn as nn
+import torch
 from sklearn.model_selection import train_test_split
 from model import JointBERT
 import matplotlib.pyplot as plt
@@ -12,11 +13,15 @@ from function import eval_loop, train_loop, init_weights, save_results
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
+# device = 'cpu'
+
+print("device: ", device)
+
 hid_size = 768
 emb_size = 300  
 
-lr = 5                                   # learning rate
-clip = 5                                 # Clip the gradients
+lr = 0.00001                                   # learning rate
+clip = 5                                       # Clip the gradients
 
 tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
 test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
@@ -59,39 +64,29 @@ slots = set(sum([line['slots'].split() for line in corpus],[]))
 
 intents = set([line['intent'] for line in corpus])
 
-lang = Lang(words, intents, slots, cutoff=0)
+lang = Lang(intents, slots)
 
 out_slot = len(lang.slot2id)
 out_int = len(lang.intent2id)
-vocab_len = len(lang.word2id)
+# vocab_len = len(lang.word2id)
 
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
 # model = BertModel.from_pretrained("bert-base-uncased") # Download the model
 
-
 train_dataset = IntentsAndSlots(train_raw, lang)
-# print(train_dataset.mapping_seq(train_dataset.utterances, lang.word2id))
-
 dev_dataset = IntentsAndSlots(dev_raw, lang)
 test_dataset = IntentsAndSlots(test_raw, lang)
 
-train_dataset.convert_to_bert_dataset(lang, tokenizer, train_raw)
-dev_dataset.convert_to_bert_dataset(lang, tokenizer, dev_raw)
-test_dataset.convert_to_bert_dataset(lang, tokenizer, test_raw)
-
 config = BertConfig.from_pretrained('bert-base-uncased')  # Load BERT configuration
 
-vocab_len_slots = len(lang.slot2id)
-print("Vocabulary length of slots:", vocab_len_slots)
-
-model = JointBERT(hid_size, len(lang.intent2id), len(lang.slot2id), config).to(device)
+model = JointBERT(hid_size, out_int, out_slot, config).to(device)
 model.apply(init_weights)
 
-optimizer = optim.Adam(model.parameters(), lr=lr)
-criterion_slots = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
+optimizer = optim.AdamW(model.parameters(), lr=lr)
+criterion_slots = nn.CrossEntropyLoss(ignore_index=lang.slot2id['O'])
 criterion_intents = nn.CrossEntropyLoss()                                   # Because we do not have the pad token
 
-print("TUTTO OK FINO A QUI")
+# print("TUTTO OK FINO A QUI")
 
 # Dataloader instantiations
 train_loader = DataLoader(train_dataset, batch_size=128, collate_fn=collate_fn,  shuffle=True)
@@ -103,7 +98,8 @@ patience = 3
 losses_train = []
 losses_dev = []
 sampled_epochs = []
-best_f1 = 0
+best_f1 = -1
+
 for x in tqdm(range(1,n_epochs)):
     loss = train_loop(train_loader, optimizer, criterion_slots, 
                       criterion_intents, model, clip=clip)
