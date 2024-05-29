@@ -43,9 +43,6 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
             slots, intents = model(sample['utterances'], sample['slots_len'])
             loss_intent = criterion_intents(intents, sample['intents'])
             
-            for gt, pred in zip(sample['y_slots'], slots):
-                print("[GT: ", gt, ", PRED: ", pred, "]")                
-
             loss_slot = criterion_slots(slots, sample['y_slots'])
             
             loss = loss_intent + loss_slot 
@@ -77,9 +74,22 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                     tmp_seq.append((utterance[id_el], lang.id2slot[elem]))
                 hyp_slots.append(tmp_seq)
         
-        # for ref, hyp in zip(ref_slots, hyp_slots):
-        #     print("REF: ", ref, " --- HYP: ", hyp)
-        #     print("\n\n")
+        for gt, pred in zip(sample['y_slots'], slots):
+            # print("[GT: ", gt, ", PRED: ", pred, "]")                   # [GT:  tensor([103,   1, 103,  20,  54, 103,  71,  33,  30, 103,   0,   0,   0,   0,
+                                                                        #       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+                                                                        #    device='cuda:0') , PRED:  tensor([[-0.1987,  4.1980,  4.2791,  ...,  5.4236,  5.4219,  5.4294],
+                                                                        #     [-0.2093, -0.8607, -0.8553,  ..., -0.9948, -0.9938, -1.0285],
+                                                                        #     [ 0.1312, -0.7867, -0.7681,  ..., -1.1061, -1.0627, -1.1118],
+                                                                        #     ...,
+                                                                        #     [-0.0619, -0.6759, -0.8207,  ..., -0.8926, -0.8756, -0.9175],
+                                                                        #     [-0.4979, -1.0681, -1.0670,  ..., -0.9667, -0.9293, -0.9085],
+                                                                        #     [-0.4283, -1.0814, -0.9237,  ..., -0.9784, -0.9536, -0.9597]],
+                                                                        #   device='cuda:0') ]
+            print("[GT: ", gt.shape, ", PRED: ", pred.shape, "]")                   
+            
+            # for elem in gt:
+                                
+
 
 
 

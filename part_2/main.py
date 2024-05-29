@@ -11,8 +11,6 @@ from transformers import BertTokenizer, BertConfig
 from pprint import pprint
 from function import eval_loop, train_loop, init_weights, save_results
 
-print("ciao")
-
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 # device = 'cpu'
@@ -109,6 +107,7 @@ for x in tqdm(range(1,n_epochs)):
         losses_train.append(np.asarray(loss).mean())
         results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, 
                                                       criterion_intents, model, lang)
+
         losses_dev.append(np.asarray(loss_dev).mean())
         
         f1 = results_dev['total']['f']
