@@ -51,9 +51,9 @@ class Lang():
         vocab = {}
         if pad:
             vocab['pad'] = PAD_TOKEN
-            vocab['unk'] = len(vocab)
         for elem in elements:
                 vocab[elem] = len(vocab)
+        vocab['unk'] = len(vocab)
         return vocab
     
 class IntentsAndSlots (data.Dataset):
@@ -193,6 +193,8 @@ def collate_fn(data):
     src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
     
     y_slots, y_lengths = merge(new_item["slots"])
+    
+    print("y_slots: ", y_slots)
     # print("intent: ", new_item["intent"])
     intent = torch.LongTensor(new_item["intent"])
     # intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
@@ -226,8 +228,14 @@ def collate_fn(data):
     new_item["token_type_ids"] = src_utt_token_type
     new_item["intents"] = intent
     new_item["y_slots"] = y_slots
+
+    
     new_item["slots_len"] = y_lengths
-    # print("type of slots: ", type(new_item["y_slots"]))
-    # print("shape of slots: ", new_item["y_slots"].shape)
+    print("type of slots: ", type(new_item["y_slots"]))
+    print("shape of slots: ", new_item["y_slots"].shape)
+    print("slot[0]: ", new_item["y_slots"][0])
+    print("slot[1]: ", new_item["y_slots"][1])
+    print("slot[2]: ", new_item["y_slots"][2])
+
     return new_item
 

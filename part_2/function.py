@@ -47,6 +47,9 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
 
             loss_intent = criterion_intents(intents, sample['intents'])
             
+            for gt, pred in zip(sample['y_slots'], slots):
+                print("[GT: ", gt, ", PRED: ", pred, "]")                
+
             loss_slot = criterion_slots(slots, sample['y_slots'])
             
             loss = loss_intent + loss_slot 
