@@ -11,6 +11,8 @@ from transformers import BertTokenizer, BertConfig
 from pprint import pprint
 from function import eval_loop, train_loop, init_weights, save_results
 
+print("ciao")
+
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 # device = 'cpu'
@@ -68,7 +70,6 @@ lang = Lang(intents, slots)
 
 out_slot = len(lang.slot2id)
 out_int = len(lang.intent2id)
-# vocab_len = len(lang.word2id)
 
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
 # model = BertModel.from_pretrained("bert-base-uncased") # Download the model

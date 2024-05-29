@@ -41,10 +41,6 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
     with torch.no_grad(): # It used to avoid the creation of computational graph
         for sample in data:
             slots, intents = model(sample['utterances'], sample['slots_len'])
-            
-            # for gt, pred in zip(sample['intents'], intents):
-            #     print("[GT: ", gt, ", PRED: ", pred, "]")
-
             loss_intent = criterion_intents(intents, sample['intents'])
             
             for gt, pred in zip(sample['y_slots'], slots):
@@ -72,7 +68,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
                 gt_ids = sample['y_slots'][id_seq].tolist()
                 gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]           
                 # gt_slots = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in gt_ids[:length]]
-                print("gt_slot: ", gt_slots)
+                # print("gt_slot: ", gt_slots)
                 utterance = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in utt_ids]
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
