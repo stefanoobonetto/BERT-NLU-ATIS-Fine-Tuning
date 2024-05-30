@@ -2,6 +2,7 @@ import torch
 from conll import evaluate
 import torch.nn as nn
 import os
+import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
@@ -14,9 +15,12 @@ def train_loop(data, optimizer, criterion_slots, criterion_intents, model, clip=
     loss_array = []
     for sample in data:
         optimizer.zero_grad() # Zeroing the gradient
-        slots, intent = model(sample['utterances'], sample['slots_len'], attention_mask=sample['attention_mask'])
+        # print(sample['utterances'], sample['attention_mask'], sample['token_type_ids'])
+        slots, intent = model(sample['utterances'], attentions=sample['attention_mask'], token_type_ids=sample['token_type_ids'])
 
         loss_intent = criterion_intents(intent, sample['intents'])
+
+        # print("shape gt: ", sample['y_slots'].shape, ", shape pred: ", slots.shape)
 
         loss_slot = criterion_slots(slots, sample['y_slots'])
         loss = loss_intent + loss_slot # In joint training we sum the losses. 
@@ -32,6 +36,7 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
     model.eval()
     loss_array = []
     
+    
     ref_intents = []
     hyp_intents = []
     
@@ -40,15 +45,13 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
     #softmax = nn.Softmax(dim=1) # Use Softmax if you need the actual probability
     with torch.no_grad(): # It used to avoid the creation of computational graph
         for sample in data:
-            slots, intents = model(sample['utterances'], sample['slots_len'])
+            slots, intents = model(sample['utterances'], attentions=sample['attention_mask'], token_type_ids=sample['token_type_ids'])
             loss_intent = criterion_intents(intents, sample['intents'])
             
             loss_slot = criterion_slots(slots, sample['y_slots'])
             
             loss = loss_intent + loss_slot 
             loss_array.append(loss.item())
-            # Intent inference
-            # Get the highest probable class
             out_intents = [lang.id2intent[x] for x in torch.argmax(intents, dim=1).tolist()] 
             gt_intents = [lang.id2intent[x] for x in sample['intents'].tolist()]
 
@@ -59,42 +62,45 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
             
             # Slot inference 
             output_slots = torch.argmax(slots, dim=1)
+
             for id_seq, seq in enumerate(output_slots):
+                
                 length = sample['slots_len'].tolist()[id_seq]
                 utt_ids = sample['utterance'][id_seq][:length].tolist()
                 gt_ids = sample['y_slots'][id_seq].tolist()
                 gt_slots = [lang.id2slot[elem] for elem in gt_ids[:length]]           
-                # gt_slots = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in gt_ids[:length]]
-                # print("gt_slot: ", gt_slots)
-                utterance = [tokenizer.convert_ids_to_tokens(int(elem)) for elem in utt_ids]
+                utterance = tokenizer.convert_ids_to_tokens(utt_ids)
                 to_decode = seq[:length].tolist()
                 ref_slots.append([(utterance[id_el], elem) for id_el, elem in enumerate(gt_slots)])
                 tmp_seq = []
                 for id_el, elem in enumerate(to_decode):
                     tmp_seq.append((utterance[id_el], lang.id2slot[elem]))
                 hyp_slots.append(tmp_seq)
-        
-        for gt, pred in zip(sample['y_slots'], slots):
-            # print("[GT: ", gt, ", PRED: ", pred, "]")                   # [GT:  tensor([103,   1, 103,  20,  54, 103,  71,  33,  30, 103,   0,   0,   0,   0,
-                                                                        #       0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
-                                                                        #    device='cuda:0') , PRED:  tensor([[-0.1987,  4.1980,  4.2791,  ...,  5.4236,  5.4219,  5.4294],
-                                                                        #     [-0.2093, -0.8607, -0.8553,  ..., -0.9948, -0.9938, -1.0285],
-                                                                        #     [ 0.1312, -0.7867, -0.7681,  ..., -1.1061, -1.0627, -1.1118],
-                                                                        #     ...,
-                                                                        #     [-0.0619, -0.6759, -0.8207,  ..., -0.8926, -0.8756, -0.9175],
-                                                                        #     [-0.4979, -1.0681, -1.0670,  ..., -0.9667, -0.9293, -0.9085],
-                                                                        #     [-0.4283, -1.0814, -0.9237,  ..., -0.9784, -0.9536, -0.9597]],
-                                                                        #   device='cuda:0') ]
-            print("[GT: ", gt.shape, ", PRED: ", pred.shape, "]")                   
+                print(to_decode)
+
+
+        tmp_ref = []
+        tmp_hyp = []
+        tmp_ref_tot = []
+        tmp_hyp_tot = []
+
+        for ref, hyp in zip(ref_slots, hyp_slots):
+            tmp_ref = []
+            tmp_hyp = []
+
+            for r, h in zip(ref, hyp):
+                if r[1] != 'pad' and r[0] != '[CLS]' and r[0] != '[SEP]':
+                    tmp_ref.append(r)
+                    tmp_hyp.append(h)
             
-            # for elem in gt:
-                                
-
-
-
+            tmp_ref_tot.append(tmp_ref)
+            tmp_hyp_tot.append(tmp_hyp)
+        
+        ref_slots = tmp_ref_tot
+        hyp_slots = tmp_hyp_tot
 
     try:            
-        results = evaluate(ref_slots, hyp_slots)
+        results = evaluate(tmp_ref_tot, tmp_hyp_tot)
 
         # print("results: ", results)
         
@@ -109,8 +115,8 @@ def eval_loop(data, criterion_slots, criterion_intents, model, lang):
     report_intent = classification_report(ref_intents, hyp_intents, 
                                           zero_division=False, output_dict=True)
 
-    for elem in report_intent:
-        print(elem, report_intent[elem], "\n\n")
+    # for elem in report_intent:
+        # print(elem, report_intent[elem], "\n\n")
     
     # print("report_intent: ", report_intent)
     return results, report_intent, loss_array
@@ -188,10 +194,6 @@ def save_results(lr, epoch, sampled_epochs, losses_dev, losses_train):
     dir = create_next_test_folder(dir)
 
     test = "[LSTM_"
-    # if drop:
-    #     test += "drop_"
-    # if bidir:
-    #     test += "bidirectional_"
     plot_line_graph(sampled_epochs, losses_dev, losses_train, os.path.join(dir, "loss_" + test + ".png"))
     save_to_csv(losses_dev, os.path.join(dir, "ppls_dev_" + test + ".csv"))
     save_to_csv(losses_train, os.path.join(dir, "" + test + ".csv"))

@@ -13,8 +13,6 @@ from function import eval_loop, train_loop, init_weights, save_results
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
-# device = 'cpu'
-
 print("device: ", device)
 
 hid_size = 768
@@ -23,8 +21,9 @@ emb_size = 300
 lr = 0.00001                                   # learning rate
 clip = 5                                       # Clip the gradients
 
-tmp_train_raw = load_data(os.path.join('dataset','ATIS','train.json'))
-test_raw = load_data(os.path.join('dataset','ATIS','test.json'))
+tmp_train_raw = load_data('/home/sagemaker-user/BERT-NLU-ATIS-Fine-Tuning/part_2/dataset/ATIS/train.json')
+test_raw = load_data('/home/sagemaker-user/BERT-NLU-ATIS-Fine-Tuning/part_2/dataset/ATIS/test.json')
+
 
 # pprint(tmp_train_raw)
 portion = 0.10
@@ -70,22 +69,20 @@ out_slot = len(lang.slot2id)
 out_int = len(lang.intent2id)
 
 tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
-# model = BertModel.from_pretrained("bert-base-uncased") # Download the model
 
 train_dataset = IntentsAndSlots(train_raw, lang)
 dev_dataset = IntentsAndSlots(dev_raw, lang)
 test_dataset = IntentsAndSlots(test_raw, lang)
 
-config = BertConfig.from_pretrained('bert-base-uncased')  # Load BERT configuration
+# config = BertConfig.from_pretrained('bert-base-uncased')  # Load BERT configuration
 
-model = JointBERT(hid_size, out_int, out_slot, config).to(device)
-model.apply(init_weights)
+model = JointBERT(hid_size, out_slot, out_int).to(device)
+# model.apply(init_weights)
 
 optimizer = optim.AdamW(model.parameters(), lr=lr)
-criterion_slots = nn.CrossEntropyLoss(ignore_index=lang.slot2id['O'])
+criterion_slots = nn.CrossEntropyLoss(ignore_index=lang.slot2id['pad'])
 criterion_intents = nn.CrossEntropyLoss()                                   # Because we do not have the pad token
 
-# print("TUTTO OK FINO A QUI")
 
 # Dataloader instantiations
 train_loader = DataLoader(train_dataset, batch_size=128, collate_fn=collate_fn,  shuffle=True)
@@ -102,7 +99,8 @@ best_f1 = -1
 for x in tqdm(range(1,n_epochs)):
     loss = train_loop(train_loader, optimizer, criterion_slots, 
                       criterion_intents, model, clip=clip)
-    if x % 5 == 0: # We check the performance every 5 epochs
+    # if x % 5 == 0: # We check the performance every 5 epochs
+    if True:
         sampled_epochs.append(x)
         losses_train.append(np.asarray(loss).mean())
         results_dev, intent_res, loss_dev = eval_loop(dev_loader, criterion_slots, 
@@ -111,6 +109,7 @@ for x in tqdm(range(1,n_epochs)):
         losses_dev.append(np.asarray(loss_dev).mean())
         
         f1 = results_dev['total']['f']
+        print(f1)
         # For decreasing the patience you can also use the average between slot f1 and intent accuracy
         if f1 > best_f1:
             best_f1 = f1

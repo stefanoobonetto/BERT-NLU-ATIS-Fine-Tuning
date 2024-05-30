@@ -1,30 +1,38 @@
+import torch.nn as nn
+from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertModel, BertConfig
+
+
 import torch
 import torch.nn as nn
-from transformers import BertPreTrainedModel, BertModel #, BertConfig
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-class JointBERT(BertPreTrainedModel):
-    def __init__(self, hid_size, len_vocab_intent,  len_vocab_slot, config):
-        super(JointBERT, self).__init__(config)     
+class JointBERT(nn.Module):
 
-        self.bert = BertModel(config=config)  # Load pretrained bert
+    def __init__(self, hid_size, out_slot, out_int):
+        super(JointBERT, self).__init__()
 
-        self.intent_layer = nn.Linear(hid_size, len_vocab_intent)
-        self.slot_layer = nn.Linear(hid_size, len_vocab_slot)
-
-    def forward(self, utterance, seq_lengths, attention_mask=None):
-        # utterance.size() = batch_size X seq_len
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+    
+        self.slot_out = nn.Linear(hid_size, out_slot)
+        self.intent_out = nn.Linear(hid_size, out_int)
         
-        # Get BERT embeddings
-        bert_emb = self.bert(utterance)[0] # bert_emb.size() = batch_size X seq_len X hid_size
+    def forward(self, utterances, attentions=None, token_type_ids=None):
+        
+        # Get the BERT output
+        outputs = self.bert(utterances, attention_mask=attentions, token_type_ids=token_type_ids)
+
+        sequence_output = outputs[0]
+        pooled_output = outputs[1]  # [CLS]
         
         # Compute slot logits
-        slots = self.slot_layer(bert_emb)
+        slots = self.slot_out(sequence_output)
         # Compute intent logits
-        intent = self.intent_layer(bert_emb[:, 0, :]) # Use the first token's representation
+        intent = self.intent_out(pooled_output)
         
         # Slot size: batch_size, seq_len, classes 
-        slots = slots.permute(0, 2, 1) # We need this for computing the loss
-
+        slots = slots.permute(0,2,1) # We need this for computing the loss
         # Slot size: batch_size, classes, seq_len
         return slots, intent
+    
+
+
