@@ -16,7 +16,6 @@ device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 print("device: ", device)
 
 hid_size = 768
-emb_size = 300  
 
 lr = 0.00001                                   # learning rate
 clip = 5                                       # Clip the gradients
@@ -24,8 +23,6 @@ clip = 5                                       # Clip the gradients
 tmp_train_raw = load_data('/home/sagemaker-user/BERT-NLU-ATIS-Fine-Tuning/part_2/dataset/ATIS/train.json')
 test_raw = load_data('/home/sagemaker-user/BERT-NLU-ATIS-Fine-Tuning/part_2/dataset/ATIS/test.json')
 
-
-# pprint(tmp_train_raw)
 portion = 0.10
 
 intents = [x['intent'] for x in tmp_train_raw] # We stringatify on intents
