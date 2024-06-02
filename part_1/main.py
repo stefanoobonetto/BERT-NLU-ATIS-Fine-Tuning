@@ -1,5 +1,6 @@
 import torch.optim as optim
 from utils import *
+import os 
 import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from model import ModelIAS
@@ -13,6 +14,7 @@ emb_size = 300
 
 DROP = True
 BIDIRECTIONAL = True
+PAD_TOKEN = 0
 
 lr = 5                             # learning rate
 clip = 5                                # Clip the gradient
