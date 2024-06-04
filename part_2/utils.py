@@ -8,11 +8,9 @@ from collections import Counter
 import torch.nn as nn
 import torch.utils.data as data
 
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-
-from torch.nn.utils.rnn import pad_sequence
 from transformers import BertTokenizer, BertConfig
-tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # Download the tokenizer
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # download the tokenizer
+device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
 PAD_TOKEN = 0
 
@@ -29,12 +27,14 @@ def load_data(path):
 
 class Lang():
     def __init__(self, intents, slots, cutoff=0):
-        self.slot2id = self.lab2id(slots)
-        self.intent2id = self.lab2id(intents, pad=False)
-        self.id2slot = {v:k for k, v in self.slot2id.items()}
-        self.id2intent = {v:k for k, v in self.intent2id.items()}
+        self.slot2id = self.lab2id(slots)                               # slot to id vocab
+        self.intent2id = self.lab2id(intents, pad=False)                # intent to id vocab
+        self.id2slot = {v:k for k, v in self.slot2id.items()}           # id to slot vocab
+        self.id2intent = {v:k for k, v in self.intent2id.items()}       # id to intent vocab
         
-    def w2id(self, elements, cutoff=None, unk=True):                    # creates a dictionary that maps unique id to each word
+    # creates a dictionary that maps unique id to each word
+
+    def w2id(self, elements, cutoff=None, unk=True):                    
         vocab = {'pad': PAD_TOKEN}
         if unk:
             vocab['unk'] = -1
@@ -46,7 +46,9 @@ class Lang():
         
         return vocab
     
-    def lab2id(self, elements, pad=True):                               # creates a dictionary that maps unique id to each label    
+    # creates a dictionary that maps unique id to each label
+
+    def lab2id(self, elements, pad=True):                                   
         vocab = {}
         if pad:
             vocab['pad'] = PAD_TOKEN
@@ -56,7 +58,6 @@ class Lang():
         return vocab
     
 class IntentsAndSlots (data.Dataset):
-    # Mandatory methods are __init__, __len__ and __getitem__
    
     def __init__(self, dataset, lang, unk='unk'):
         self.utterances = []
@@ -71,31 +72,13 @@ class IntentsAndSlots (data.Dataset):
         self.unk = unk
         
         for x in dataset:
-            self.utterances.append("[CLS] " + x['utterance'] + " [SEP]")
-            self.slots.append("O " + x['slots'] + " O")
+            self.utterances.append("[CLS] " + x['utterance'] + " [SEP]")                # add typical BOF adn EOF BERT tags 
+            self.slots.append("O " + x['slots'] + " O")                                 # and their respective slots 
             self.intents.append(x['intent'])
 
         self.utt_ids, self.slot_ids, self.attention_mask, self.token_type_ids = self.mapping_seq(self.utterances, self.slots, tokenizer, lang.slot2id)
 
         self.intent_ids = self.mapping_lab(self.intents, lang.intent2id)
-        
-
-        # for intent, intent_id in zip(self.intents, self.intent_ids):
-        #     print("Intent: ", str(intent)) 
-        #     print("Intent[IDs]: ", str(intent_id))
-        #     print("Translated id to token: ", lang.id2intent[intent_id])
-
-        # for i in range(len(self.utterances)):
-        #     print("Phrase:                      ", self.utterances[i])
-        #     print("Phrase[IDs]:                 ", self.utt_ids[i]['input_ids'])
-
-        #     # print("last_id: ", self.utt_ids[i]['input_ids'][-1], " correspond to ", tokenizer.convert_ids_to_tokens([self.utt_ids[i]['input_ids'][-1]]))
-        #     print("Slots:                       ", self.slots[i])
-        #     print("Slots[IDs]:                  ", self.slot_ids[i]['input_ids'])
-        #     print("Intent:                      ", self.intents[i])
-        #     print("Intent[IDs]:                 ", self.intent_ids[i]['input_ids'])
-
-        #     print("\n\n")
 
     def __len__(self):
         return len(self.utterances)
@@ -110,7 +93,7 @@ class IntentsAndSlots (data.Dataset):
         return sample
     
     def mapping_lab(self, data, mapper):
-        return [mapper[x] if x in mapper else mapper[self.unk] for x in data]
+        return [mapper[x] if x in mapper else mapper[self.unk] for x in data]           # intents mapped to id
     
     def mapping_seq(self, utterances, slots, tokenizer, mapper_slot): # Map sequences to number
         res_utt = []
@@ -118,24 +101,23 @@ class IntentsAndSlots (data.Dataset):
         res_attention = []
         res_token_type_id = []
         
-        for sequence, slot in zip(utterances, slots):
-            # print("utterance: ", sequence, ",            len: ", len(sequence.split()), "len_bert: ", len(tokenizer(sequence)['input_ids']))
+        for sequence, slot in zip(utterances, slots):  # iterate through each sequence and its corresponding slots
             tmp_seq = []
             tmp_slot = []
             tmp_attention = []
             tmp_token_type_id = []
 
-            for word, elem in zip(sequence.split(), slot.split(' ')):
-                tmp_attention.append(1)
-                tmp_token_type_id.append(0)
-                word_tokens = tokenizer(word)
-                word_tokens = word_tokens[1:-1]
+            for word, elem in zip(sequence.split(), slot.split(' ')):  # iterate through each word and its corresponding slot tag
+                tmp_attention.append(1)                         # append 1 to attention mask for the word
+                tmp_token_type_id.append(0)                     # append 0 to token type ids for the word
+                word_tokens = tokenizer(word)                   # tokenize the word with BERT
+                word_tokens = word_tokens[1:-1]                 # remove special tokens ([CLS] and [SEP])
 
                 tmp_seq.extend(word_tokens['input_ids'])
-                tmp_slot.extend([mapper_slot[elem]] + [mapper_slot['pad']] * (len(word_tokens['input_ids']) - 1))
+                tmp_slot.extend([mapper_slot[elem]] + [mapper_slot['pad']] * (len(word_tokens['input_ids']) - 1))  # add slot tag and pad for sub-tokens
 
                 for i in range(len(word_tokens['input_ids']) - 1):
-                    tmp_attention.append(0)
+                    tmp_attention.append(0)                         # append 0 to attention mask for sub-tokens
                     tmp_token_type_id.append(0)
 
             res_utt.append(tmp_seq)
@@ -143,50 +125,44 @@ class IntentsAndSlots (data.Dataset):
             res_attention.append(tmp_attention)
             res_token_type_id.append(tmp_token_type_id)
 
-            # print("utterance: ", tokenizer.tokenize(sequence), ",            len: ", len(tokenizer.tokenize(sequence)), "\nutterance_bert: ", tokenizer.convert_ids_to_tokens(tmp_seq) ,"len_bert: ", len(tmp_seq), "\n\n")
-
         return res_utt, res_slot, res_attention, res_token_type_id
 
 def collate_fn(data):
     def merge(sequences):
         '''
-        merge from batch * sent_len to batch * max_len 
+        merge from batch * sent_len to batch * max_len
         '''
         lengths = [len(seq) for seq in sequences]
         max_len = 1 if max(lengths)==0 else max(lengths)
 
         # Pad token is zero in our case
-        # So we create a matrix full of PAD_TOKEN (i.e. 0) with the shape 
+        # So we create a matrix full of PAD_TOKEN (i.e. 0) with the shape
         # batch_size X maximum length of a sequence
-        
+
         padded_seqs = torch.LongTensor(len(sequences),max_len).fill_(PAD_TOKEN)
         for i, seq in enumerate(sequences):
             end = lengths[i]
-            padded_seqs[i, :end] = seq # We copy each sequence into the matrix
-        # print(padded_seqs)
-        padded_seqs = padded_seqs.detach()  # We remove these tensors from the computational graph
+            padded_seqs[i, :end] = seq                  # copy each sequence into the matrix, substituting 0 with respective ids of the words (if present)
+        padded_seqs = padded_seqs.detach()  
+   
         return padded_seqs, lengths
-    # Sort data by seq lengths
-
    
     data.sort(key=lambda x: len(x['utterance']), reverse=True) 
     new_item = {}
+
     for key in data[0].keys():
         new_item[key] = [d[key] for d in data]
         
     # We just need one length for packed pad seq, since len(utt) == len(slots)
-    src_utt, _ = merge(new_item['utterance'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
-    attention, _ = merge(new_item['attention_mask'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
-    token_type_ids, _ = merge(new_item['token_type_ids'])                  # input_ids': utt, 'attention_mask': att, 'token_type_ids': token})
-    
+    src_utt, _ = merge(new_item['utterance'])                  
+    attention, _ = merge(new_item['attention_mask'])                  
+    token_type_ids, _ = merge(new_item['token_type_ids'])                  
+
     y_slots, y_lengths = merge(new_item["slots"])
     
-    # print("y_slots: ", y_slots)
-    # print("intent: ", new_item["intent"])
     intent = torch.LongTensor(new_item["intent"])
-    # intent = pad_sequence(intent, batch_first=True, padding_value=0)        # Pad the sequences (some intents may be composed by more tokens)
     
-    src_utt = src_utt.to(device) # We load the Tensor on our selected device
+    src_utt = src_utt.to(device) 
     y_slots = y_slots.to(device)
     intent = intent.to(device)
     attention = attention.to(device)
@@ -199,12 +175,6 @@ def collate_fn(data):
     new_item["intents"] = intent
     new_item["y_slots"] = y_slots
     new_item["slots_len"] = y_lengths
-
-    # print("type of slots: ", type(new_item["y_slots"]))
-    # print("shape of slots: ", new_item["y_slots"].shape)
-    # print("slot[0]: ", new_item["y_slots"][0])
-    # print("slot[1]: ", new_item["y_slots"][1])
-    # print("slot[2]: ", new_item["y_slots"][2])
 
     return new_item
 

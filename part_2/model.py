@@ -21,16 +21,15 @@ class JointBERT(nn.Module):
         # Get the BERT output
         outputs = self.bert(utterances, attention_mask=attentions, token_type_ids=token_type_ids)
 
-        sequence_output = outputs[0]
+        sequence_output = outputs[0]  # extract the sequence output from BERT corresponding to the slots prediction
         pooled_output = outputs[1]  # [CLS]
         
-        # Compute slot logits
-        slots = self.slot_out(sequence_output)
-        # Compute intent logits
-        intent = self.intent_out(pooled_output)
+        slots = self.slot_out(sequence_output)  # pass it through the slot output layer
+        
+        intent = self.intent_out(pooled_output) # compute intent logits
         
         # Slot size: batch_size, seq_len, classes 
-        slots = slots.permute(0,2,1) # We need this for computing the loss
+        slots = slots.permute(0, 2, 1)  # permute the slots tensor to match the expected shape
         # Slot size: batch_size, classes, seq_len
         return slots, intent
     
